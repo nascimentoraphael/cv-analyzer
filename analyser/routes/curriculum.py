@@ -5,8 +5,12 @@ from service.file_service import FileService
 from factories.resume_factory import ResumFactory
 from factories.analysis_factory import AnalysisFactory
 import streamlit as st
+import time
+import concurrent.futures
+import traceback
 
 DESTINATION_PATH = 'storage'
+MAX_PROCESSING_TIME = 300  # 5 minutos de timeout
 
 class CurriculumRoute:
     def __init__(self) -> None:
@@ -15,84 +19,122 @@ class CurriculumRoute:
         self.job = {}
         self._ai = LlamaClient()
         self._file_service = FileService()
-        
-    def resum(self, contents, job):
-        results = []
-        for cv, path in contents:
-            result = self._ai.resume_cv(cv)
-            results.append((result, path))
-        return results
     
     def get_files(self, uploaded_files):
         saved_file_paths = self._file_service.save_uploaded_files(uploaded_files, 'storage')
         contents = self._file_service.read_all(saved_file_paths)
         return list(zip(contents, saved_file_paths))
    
-    def create_analyse(self, uploaded_files, job_name):
-        """Processa a análise dos currículos e retorna resultados para exibição no Streamlit"""
+    def process_single_cv(self, content, path, job):
+        """Processa um único currículo"""
         try:
-            # Configurar o job
-            self.job = self.database.get_job_by_name(job_name)
+            # Gerar resumo do currículo
+            resum_result = self._ai.resume_cv(content)
             
-            # Inicializar lista para armazenar resultados
-            analysis_results = []
+            # Gerar opinião sobre o currículo
+            opnion = self._ai.generate_opnion(content, job)
             
-            # Processar cada arquivo
-            for content, path in self.get_files(uploaded_files):
-                # Gerar resumo do currículo
-                resum_result = self._ai.resume_cv(content)
-                
-                # Gerar opinião sobre o currículo
-                opnion = self._ai.generate_opnion(content, self.job)
-                
-                # Calcular pontuação
-                score = self._ai.generate_score(content, self.job)
-                
-                # Calcular scores para diferentes categorias
-                score_competence = self._ai.score_qualifications(content, self.job.get('competence'))
-                score_strategies = self._ai.score_qualifications(content, self.job.get('strategies'))
-                score_qualifications = self._ai.score_qualifications(content, self.job.get('qualifications'))
-                
-                # Armazenar resultados
-                analysis_results.append({
-                    'resum_result': resum_result,
-                    'opnion': opnion,
-                    'score': score,
-                    'score_competence': score_competence,
-                    'score_strategies': score_strategies,
-                    'score_qualifications': score_qualifications,
-                    'path': path
-                })
+            # Calcular pontuação
+            score = self._ai.generate_score(content, job)
             
-            return analysis_results
-        
+            # Calcular scores para diferentes categorias
+            score_competence = self._ai.score_qualifications(content, job.get('competence'))
+            score_strategies = self._ai.score_qualifications(content, job.get('strategies'))
+            score_qualifications = self._ai.score_qualifications(content, job.get('qualifications'))
+            
+            return {
+                'resum_result': resum_result,
+                'opnion': opnion,
+                'score': score,
+                'score_competence': score_competence,
+                'score_strategies': score_strategies,
+                'score_qualifications': score_qualifications,
+                'path': path
+            }
         except Exception as e:
-            st.error(f"Erro ao processar currículos: {str(e)}")
-            return []
+            st.error(f"Erro ao processar currículo {path}: {str(e)}")
+            traceback.print_exc()
+            return None
 
     def render_analysis(self, uploaded_files, job_name):
-        """Método para renderizar a análise no Streamlit"""
-        # Processar currículos
-        analysis_results = self.create_analyse(uploaded_files, job_name)
+        """Renderiza a análise dos currículos com timeout e controle de estado"""
+        # Configurar o job
+        self.job = self.database.get_job_by_name(job_name)
         
-        # Renderizar resultados
-        for result in analysis_results:
-            st.subheader(f"📌 Análise do Currículo para a vaga: **{job_name}**")
+        # Placeholder para mostrar progresso
+        progress_text = st.empty()
+        progress_bar = st.progress(0)
+        
+        try:
+            # Obter arquivos
+            files_to_process = self.get_files(uploaded_files)
+            total_files = len(files_to_process)
             
-            # Resumo da IA
-            st.write("### **Resumo da IA:**", result['resum_result'])
+            # Lista para armazenar resultados
+            analysis_results = []
             
-            # Opinião da IA
-            st.write("### **Opinião da IA:**", result['opnion'])
+            # Processamento paralelo com timeout
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Preparar futures
+                futures = [
+                    executor.submit(self.process_single_cv, content, path, self.job) 
+                    for content, path in files_to_process
+                ]
+                
+                # Aguardar resultados com timeout
+                start_time = time.time()
+                completed_count = 0
+                
+                for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                    # Verificar timeout
+                    if time.time() - start_time > MAX_PROCESSING_TIME:
+                        st.error("Tempo máximo de processamento excedido!")
+                        break
+                    
+                    # Atualizar progresso
+                    completed_count = i
+                    progress_text.text(f"Processando curriculum {completed_count} de {total_files}")
+                    progress_bar.progress(completed_count / total_files)
+                    
+                    # Obter resultado
+                    result = future.result()
+                    if result:
+                        analysis_results.append(result)
             
-            # Exibir Pontuação Final
-            st.write("## **📊 Pontuação Final**")
-            st.write(f"✅ **Relevantidade para a Vaga:** `{result['score_competence'][0]:.1f}`")
-            st.write(f"🔧 **Conhecimento em IoT e IIoT:** `{result['score_strategies'][0]:.1f}`")
-            st.write(f"🏭 **Experiência com Sistemas Industriais:** `{result['score_qualifications'][0]:.1f}`")
-            st.write(f"📈 **Gerenciamento de Projetos:** `{result['score']:.1f}`")
+            # Limpar indicadores de progresso
+            progress_text.empty()
+            progress_bar.empty()
             
-            # Barra de progresso
-            st.progress(int(result['score'] * 10))  # Normalizando para 0-100
+            # Renderizar resultados
+            if not analysis_results:
+                st.warning("Nenhum currículo processado com sucesso.")
+                return
             
-            st.divider()  # Separador entre análises
+            for result in analysis_results:
+                st.subheader(f"📌 Análise do Currículo para a vaga: **{job_name}**")
+                
+                # Resumo da IA
+                st.write("### **Resumo da IA:**", result['resum_result'])
+                
+                # Opinião da IA
+                st.write("### **Opinião da IA:**", result['opnion'])
+                
+                # Exibir Pontuação Final
+                st.write("## **📊 Pontuação Final**")
+                st.write(f"✅ **Relevantidade para a Vaga:** `{result['score_competence'][0]:.1f}`")
+                st.write(f"🔧 **Conhecimento em IoT e IIoT:** `{result['score_strategies'][0]:.1f}`")
+                st.write(f"🏭 **Experiência com Sistemas Industriais:** `{result['score_qualifications'][0]:.1f}`")
+                st.write(f"📈 **Gerenciamento de Projetos:** `{result['score']:.1f}`")
+                
+                # Barra de progresso
+                st.progress(int(result['score'] * 10))  # Normalizando para 0-100
+                
+                st.divider()  # Separador entre análises
+        
+        except Exception as e:
+            st.error(f"Erro geral no processamento: {str(e)}")
+            traceback.print_exc()
+        finally:
+            # Garantir que os indicadores de progresso sejam removidos
+            progress_text.empty()
+            progress_bar.empty()
