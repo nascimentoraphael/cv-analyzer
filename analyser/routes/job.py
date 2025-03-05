@@ -38,11 +38,12 @@ class JobRoute:
         main_activities = st.text_area('Atividades Principais')
         prerequisites = st.text_area('Pré Requisitos')
         differentials = st.text_area('Diferenciais')
+        
         if st.form_submit_button('Salvar'):
             if not all([sheet_name, job_name, main_activities, prerequisites, differentials]):
-                    st.error('O meu querido, não tem como salvar uma vaga sem preencher os dados!')
-                    return
-                
+                st.error('O meu querido, não tem como salvar uma vaga sem preencher os dados!')
+                return
+            
             job_dict = {
                 'job_name': job_name,
                 'main_activities': main_activities,
@@ -51,15 +52,11 @@ class JobRoute:
             }
             
             with st.spinner('Aguarde um momento...'):
-            
                 competence = self.llm.create_competence(job_dict)
                 strategies = self.llm.create_strategies(job_dict)
                 qualification = self.llm.create_qualification(job_dict)
                 score_qualification = self.llm.score_competence(job_dict, qualification)
                 
-                print(score_qualification)
-                print(type(score_qualification))
-        
                 JobFactory(
                     name=job_name,
                     main_activities=main_activities,
@@ -72,7 +69,10 @@ class JobRoute:
                     score_qualification=score_qualification,
                 ).create()
                 
-                st.warning('Compartilhe a tabela (google sheets) e a pasta do drive com o email: ga-api-client@scidata-299417.iam.gserviceaccount.com')
+                st.success('Vaga salva com sucesso!')
+                # Atualiza a interface para recarregar os dados
+                st.experimental_rerun()
+
 
     def edition_job_form(self, st, options):
         all_sheet_names = self.database.get_all_sheet_names_in_jobs()
