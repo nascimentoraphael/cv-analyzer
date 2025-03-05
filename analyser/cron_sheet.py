@@ -111,13 +111,19 @@ def get_files_in_sheets():
                     print(err.args)
                     raise err
                     
+MAX_RETRIES = 5
+retry_count = 0
+
 if __name__ == "__main__":
-    while True:
+    while retry_count < MAX_RETRIES:
         try:
             get_files_in_sheets()
+            retry_count = 0  # Reseta contagem se sucesso
         except Exception as err:
-            print(err) 
+            print(f"Erro {retry_count + 1}: {err}")
+            retry_count += 1
             time.sleep(20)
-            continue
+    
+    print("Máximo de tentativas atingido. Encerrando processo.")
 
 

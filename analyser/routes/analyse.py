@@ -4,9 +4,6 @@ import streamlit as st
 from database.tiny_db import AnalyserDatabase
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
-
-
-
 class AnalyseRoute:
     def __init__(self) -> None:
         self.database = AnalyserDatabase()
@@ -45,56 +42,61 @@ class AnalyseRoute:
         self.df_candidate = pd.DataFrame(
             self._get_all_analysis(),
             columns=[
-            'name',
-            'education',
-            'skills',
-            'languages',
-            'score',
-            'resum_id',
-            'id'
+                'name',
+                'education',
+                'skills',
+                'languages',
+                'score',
+                'resum_id',
+                'id'
             ]
         )
 
         self.df_candidate.rename(
             columns={
-            'name': 'Nome',
-            'education': 'Educação',
-            'skills': 'Habilidades',
-            'languages': 'Idiomas',
-            'score': 'score',
-            'resum_id': 'resum_id',
-            'id': 'id'
-        }, inplace=True)
-       
-       # 🛑 Log para verificar se há dados
+                'name': 'Nome',
+                'education': 'Educação',
+                'skills': 'Habilidades',
+                'languages': 'Idiomas',
+                'score': 'score',
+                'resum_id': 'resum_id',
+                'id': 'id'
+            }, inplace=True
+        )
+
         if self.df_candidate.empty:
-            st.warning("⚠️ Nenhum dado disponível para análise de candidatos.")
             print("⚠️ O DataFrame `df_candidate` está vazio.")
 
         return self.df_candidate
 
-    def _grid_builder(self):
-        gb = GridOptionsBuilder.from_dataframe(self._create_dataframe_to_analyse())
+    def _grid_builder(self, df):
+        gb = GridOptionsBuilder.from_dataframe(df)
         gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=800)
-        if self.data_analysis:
+        if not df.empty:
             gb.configure_column("score", header_name="score", sort="desc")
             gb.configure_selection(selection_mode="multiple", use_checkbox=True)
-
         return gb.build()
 
     def render_grid(self, job_name):
         self._set_job_by_name(job_name)
+        df = self._create_dataframe_to_analyse()
+        
+        if df.empty:
+            st.warning("Nenhum candidato encontrado para esta vaga.")
+            return pd.DataFrame()
+
+        grid_options = self._grid_builder(df)
         response = AgGrid(
-            self._create_dataframe_to_analyse(),
-            gridOptions=self._grid_builder(),
+            df,
+            gridOptions=grid_options,
             enable_enterprise_modules=True,
             update_mode=GridUpdateMode.SELECTION_CHANGED,
             theme='balham',
         )
         
-        df = self._create_selected_candidates_df(response.get('selected_rows', []))
-        return df
-    
+        selected_df = self._create_selected_candidates_df(response.get('selected_rows', []))
+        return selected_df
+
     def _delete_all_files_into_analyse(self):
         for resum in self.resums:
             path = resum.get('file')

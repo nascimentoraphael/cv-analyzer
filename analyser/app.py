@@ -72,14 +72,20 @@ def radar_chart_multiple_trace(categories, job_scores, resum_scores):
 st.set_page_config(layout="wide", page_title="Recruter", page_icon=":brain:")
 
 def render_analyse():
-    # Exemplo: supondo que você tenha uma classe para análise
     analyse_route = AnalyseRoute()
 
     option = st.selectbox("Escolha sua vaga:", analyse_route.jobs, index=None)
     if option:
         st.subheader('Classificação dos Candidatos')
-        with st.expander('Gráfico Geral de Pontuação'):
-            bar = st.empty()
+        
+        # Adicione verificação de candidatos
+        candidates = analyse_route.render_grid(option)
+        
+        if not candidates.empty:
+            # Seu código atual de renderização
+            bar.bar_chart(analyse_route._create_dataframe_to_analyse(), x="Nome", y="score", color="Nome", horizontal=True)
+        else:
+            st.info("Nenhum candidato encontrado para esta vaga.")
 
 
         # Renderiza a tabela de candidatos (AgGrid ou outro) e retorna "candidates" se houver seleções
