@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import streamlit as st
 from database.tiny_db import AnalyserDatabase
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
@@ -64,6 +65,12 @@ class AnalyseRoute:
             'resum_id': 'resum_id',
             'id': 'id'
         }, inplace=True)
+       
+       # 🛑 Log para verificar se há dados
+        if self.df_candidate.empty:
+            st.warning("⚠️ Nenhum dado disponível para análise de candidatos.")
+            print("⚠️ O DataFrame `df_candidate` está vazio.")
+
         return self.df_candidate
 
     def _grid_builder(self):

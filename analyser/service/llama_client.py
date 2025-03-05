@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain_ollama import OllamaLLM
 import re
 
 load_dotenv()
@@ -7,14 +7,11 @@ load_dotenv()
 
 class LlamaClient:
     def __init__(self):
-        self.client = ChatOpenAI(
-            model_name="gpt-4o-mini",
-            temperature=0.1,
-        )
+        self.client = OllamaLLM(model="llama3")
 
     def generate_response(self, prompt):
         response = self.client.invoke(prompt)
-        return response.content
+        return response
     
     def score_competence(self, job, qualifications):
         prompt = f'''
