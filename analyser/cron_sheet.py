@@ -89,27 +89,34 @@ def get_files_in_sheets():
             
             print(len(resums_ids))
                     
-        for id in resums_ids:
-            if not id.startswith("Faça") and not id == '104kU92P7igU9-ll1C0JVQcU5aKBz3yrT':                
-                print(id)
-                path = sheet.download_file(id)
-                try:
-                    content = read_uploaded_file(path)
-                    resum = ai.resume_cv(content, job)
-                    opnion = ai.generate_opnion(content, job)
-                    score = ai.generate_score(resum, job)
-                    print(f'esse é o retorno da func: {score}')
-                    resum_schema = Resum(id=str(uuid.uuid4()), job_id=job.get('id'), content=resum, file=str(path), opnion=opnion)
-                    file = File(file_id=id, job_id=job.get('id')).model_dump()
-                    analysis = extract_data_analysis(resum, resum_schema.job_id, resum_schema.id, score).model_dump()
-                    database.insert_resum(resum_schema)
-                    database.analysis.insert(analysis)
-                    database.files.insert(file)
-                except Exception as err:
-                    if os.path.isfile(path):
-                        os.remove(path)
-                    print(err.args)
-                    raise err
+        # Adicionar tratamento de erro no loop de processamento:
+for id in resums_ids:
+    if not id.startswith("Faça") and not id == '104kU92P7igU9-ll1C0JVQcU5aKBz3yrT':                
+        try:
+            path = sheet.download_file(id)
+            content = read_uploaded_file(path)
+            resum = ai.resume_cv(content, job)
+            opnion = ai.generate_opnion(content, job)
+            score = ai.generate_score(resum, job)
+            
+            # --- INSERIR VALIDAÇÃO DE SCORE ---
+            if not isinstance(score, float):
+                raise ValueError("Score inválido")
+                
+            resum_schema = Resum(id=str(uuid.uuid4()), job_id=job.get('id'), content=resum, file=str(path), opnion=opnion)
+            file = File(file_id=id, job_id=job.get('id')).model_dump()
+            analysis = extract_data_analysis(resum, resum_schema.job_id, resum_schema.id, score).model_dump()
+            
+            # --- INSERIR DADOS NO BANCO ---
+            database.insert_resum(resum_schema)
+            database.analysis.insert(analysis)
+            database.files.insert(file)
+            
+        except Exception as err:
+            if os.path.isfile(path):
+                os.remove(path)
+            print(f"Erro ao processar {id}: {str(err)}")  # Log detalhado
+            continue  # Continua o loop mesmo com erro
                     
 MAX_RETRIES = 5
 retry_count = 0

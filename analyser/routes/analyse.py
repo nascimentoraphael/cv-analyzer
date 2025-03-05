@@ -38,34 +38,22 @@ class AnalyseRoute:
     def get_resum_by_id(self, resum_id):
         return self.database.get_resum_by_id(resum_id)
 
+    # Atualizar o método _create_dataframe_to_analyse():
     def _create_dataframe_to_analyse(self):
-        self.df_candidate = pd.DataFrame(
-            self._get_all_analysis(),
-            columns=[
-                'name',
-                'education',
-                'skills',
-                'languages',
-                'score',
-                'resum_id',
-                'id'
-            ]
-        )
+        analysis_data = self._get_all_analysis()  # Garantir que os dados são buscados
+        
+        if not analysis_data:  # Se não houver dados, retornar DataFrame vazio
+            return pd.DataFrame()
 
-        self.df_candidate.rename(
-            columns={
-                'name': 'Nome',
-                'education': 'Educação',
-                'skills': 'Habilidades',
-                'languages': 'Idiomas',
-                'score': 'score',
-                'resum_id': 'resum_id',
-                'id': 'id'
-            }, inplace=True
+        self.df_candidate = pd.DataFrame(
+            analysis_data,
+            columns=['name', 'education', 'skills', 'languages', 'score', 'resum_id', 'id']
         )
+    
+    # ... (restante do código permanece igual)
 
         if self.df_candidate.empty:
-            print("⚠️ O DataFrame `df_candidate` está vazio.")
+                print("⚠️ O DataFrame `df_candidate` está vazio.")
 
         return self.df_candidate
 

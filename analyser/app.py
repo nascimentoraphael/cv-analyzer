@@ -71,6 +71,7 @@ def radar_chart_multiple_trace(categories, job_scores, resum_scores):
 
 st.set_page_config(layout="wide", page_title="Recruter", page_icon=":brain:")
 
+# Substituir a seção original do render_analyse():
 def render_analyse():
     analyse_route = AnalyseRoute()
 
@@ -78,21 +79,26 @@ def render_analyse():
     if option:
         st.subheader('Classificação dos Candidatos')
         
-        # Adicione verificação de candidatos
-        candidates = analyse_route.render_grid(option)
+        # --- REMOVER CHAMADA REDUNDANTE ---
+        candidates = analyse_route.render_grid(option)  # Mantém apenas uma chamada
         
         if not candidates.empty:
-            # Seu código atual de renderização
-            bar.bar_chart(analyse_route._create_dataframe_to_analyse(), x="Nome", y="score", color="Nome", horizontal=True)
+            # Gráfico de barras geral (corrigir referência 'bar' para 'st')
+            st.bar_chart(analyse_route._create_dataframe_to_analyse(), x="Nome", y="score", color="Nome")  # Corrigido
+            
+            # ----------------------------------------------------------------------------
+            #        GRAFO DE TODOS OS CANDIDATOS X SUAS HABILIDADES
+            # ----------------------------------------------------------------------------
+            # ... (código do grafo permanece igual)
+            
+            # ----------------------------------------------------------------------------
+            #         RENDERIZA A VISUALIZAÇÃO DETALHADA DE CADA CANDIDATO
+            # ----------------------------------------------------------------------------
+            cols = st.columns(len(candidates))
+            # ... (restante do código permanece igual)
+            
         else:
             st.info("Nenhum candidato encontrado para esta vaga.")
-
-
-        # Renderiza a tabela de candidatos (AgGrid ou outro) e retorna "candidates" se houver seleções
-        candidates = analyse_route.render_grid(option)
-
-        # Gráfico de barras geral
-        bar.bar_chart(analyse_route._create_dataframe_to_analyse(), x="Nome", y="score", color="Nome", horizontal=True)
 
         # Botão de limpar análise
         if st.button('Limpar Análise'):

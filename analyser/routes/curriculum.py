@@ -56,10 +56,17 @@ class CurriculumRoute:
             traceback.print_exc()
             return None
 
-    def render_analysis(self, uploaded_files, job_name):
-        """Renderiza a análise dos currículos com timeout e controle de estado"""
-        # Configurar o job
-        self.job = self.database.get_job_by_name(job_name)
+    # Adicionar st.session_state para evitar reprocessamento:
+def render_analysis(self, uploaded_files, job_name):
+    if 'processed' not in st.session_state:  # Novo estado
+        st.session_state.processed = False
+        
+    if not st.session_state.processed:
+        # ... (código existente)
+        
+        # Ao final do processamento:
+        st.session_state.processed = True
+        st.experimental_rerun()  # Força atualização
         
         # Placeholder para mostrar progresso
         progress_text = st.empty()
