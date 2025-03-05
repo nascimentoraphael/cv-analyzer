@@ -30,10 +30,15 @@ class AccessResume:
         with open(full_path, "wb") as file:
             downloader = googleapiclient.http.MediaIoBaseDownload(file, request)
             done = False
-            while not done:
+            max_chunks = 100  # limite máximo de iterações
+            chunk_count = 0
+            while not done and chunk_count < max_chunks:
                 _, done = downloader.next_chunk()
-        
+                chunk_count += 1
+            if not done:
+                raise Exception("Download não completou após o número máximo de chunks.")
         return full_path
+
 
     def check_file_access(file_id):
         try:
